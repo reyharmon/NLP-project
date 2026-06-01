@@ -334,7 +334,7 @@ def main():
 
     # Footer
     st.markdown(
-        '<div class="footer">NLP Final Project · COMP6885001 · Bina Nusantara University · 2025<br>'
+        '<div class="footer">NLP Final Project · COMP6885001 · Bina Nusantara University · 2026<br>'
         'Andrey Apriliady · Ezra Mayurga · Keanu Stadeva</div>',
         unsafe_allow_html=True,
     )
