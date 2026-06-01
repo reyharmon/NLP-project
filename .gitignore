@@ -1,0 +1,15 @@
+# Model files (terlalu besar untuk GitHub, simpan di HuggingFace Hub)
+../model_t5base/
+../model bart/
+../model_final.zip
+../dataset.zip
+../dataset/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Streamlit
+.streamlit/secrets.toml

@@ -8,9 +8,8 @@ Course: COMP6885001 - NLP | Bina Nusantara University
 
 import streamlit as st
 import torch
-import re
 import os
-from transformers import BartTokenizer, BartForConditionalGeneration
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 # ── Page Config ─────────────────────────────────────────────
 st.set_page_config(
@@ -77,28 +76,28 @@ RISK_CATEGORIES = {
 
 # ── Model Loading ────────────────────────────────────────────
 
+HF_MODEL_ID = "username/tos-t5base"  # ← ganti dengan repo HuggingFace kamu
+
 @st.cache_resource(show_spinner=False)
 def load_model():
-    local_path = "./model"
+    # Coba load lokal dulu (development), fallback ke HuggingFace (production)
+    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "model_t5base")
     if os.path.exists(local_path) and os.path.exists(os.path.join(local_path, "config.json")):
         try:
-            tokenizer = BartTokenizer.from_pretrained(local_path)
-            model = BartForConditionalGeneration.from_pretrained(
+            tokenizer = AutoTokenizer.from_pretrained(local_path)
+            model = AutoModelForSeq2SeqLM.from_pretrained(
                 local_path, torch_dtype=torch.float32
             )
-            return tokenizer, model, "Fine-tuned on ToS corpus"
-        except Exception:
-            pass
+            return tokenizer, model, "T5-base Fine-tuned on ToS corpus"
+        except Exception as e:
+            st.warning(f"Gagal load model lokal: {e}. Mencoba HuggingFace Hub...")
 
-    model_id = "facebook/bart-large-cnn"
-    tokenizer = BartTokenizer.from_pretrained(model_id)
-    model = BartForConditionalGeneration.from_pretrained(
-        model_id, torch_dtype=torch.float32
-    )
-    return tokenizer, model, f"Pre-trained ({model_id})"
+    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
+    model = AutoModelForSeq2SeqLM.from_pretrained(HF_MODEL_ID, torch_dtype=torch.float32)
+    return tokenizer, model, "T5-base Fine-tuned on ToS corpus"
 
 
-def chunk_text(text: str, max_words: int = 700) -> list:
+def chunk_text(text: str, max_words: int = 400) -> list:
     words = text.split()
     return [
         ' '.join(words[i: i + max_words])
@@ -110,16 +109,18 @@ def chunk_text(text: str, max_words: int = 700) -> list:
 def generate_summary(text: str, tokenizer, model) -> str:
     device = next(model.parameters()).device
     word_count = len(text.split())
-    chunks = chunk_text(text, max_words=700) if word_count > 700 else [text]
+    chunks = chunk_text(text, max_words=400) if word_count > 400 else [text]
     chunks = chunks[:4]
 
     summaries = []
     per_chunk_len = max(80, 256 // len(chunks))
 
     for chunk in chunks:
+        # T5 requires task prefix
+        input_text = "summarize: " + chunk
         inputs = tokenizer(
-            chunk,
-            max_length=1024,
+            input_text,
+            max_length=512,
             truncation=True,
             return_tensors="pt",
         ).to(device)
@@ -191,8 +192,9 @@ def inject_css():
         color: #6b7280;
         margin-bottom: 1.5rem;
     }
-    /* Hide deploy button */
+    /* Hide deploy button & running indicator */
     [data-testid="stDeployButton"] { display: none !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
     .summary-box {
         background-color: #f0f9ff;
         border-left: 4px solid #0ea5e9;
@@ -342,8 +344,7 @@ def main():
 
     # Footer
     st.markdown(
-        '<div class="footer">NLP Final Project · COMP6885001 · Bina Nusantara University · 2025<br>'
-        'Andrey Apriliady · Ezra Mayurga · Keanu Stadeva</div>',
+        '<div class="footer">NLP Final Project</div>',
         unsafe_allow_html=True,
     )
 
