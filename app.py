@@ -76,28 +76,16 @@ RISK_CATEGORIES = {
 
 # ── Model Loading ────────────────────────────────────────────
 
-HF_MODEL_ID = "username/tos-t5base"  # ← ganti dengan repo HuggingFace kamu
+HF_MODEL_ID = "reyharmon/t5-base-ToS-corpus"
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    # Coba load lokal dulu (development), fallback ke HuggingFace (production)
-    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "model_t5base")
-    if os.path.exists(local_path) and os.path.exists(os.path.join(local_path, "config.json")):
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(local_path)
-            model = AutoModelForSeq2SeqLM.from_pretrained(
-                local_path, torch_dtype=torch.float32
-            )
-            return tokenizer, model, "T5-base Fine-tuned on ToS corpus"
-        except Exception as e:
-            st.warning(f"Gagal load model lokal: {e}. Mencoba HuggingFace Hub...")
-
     tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
     model = AutoModelForSeq2SeqLM.from_pretrained(HF_MODEL_ID, torch_dtype=torch.float32)
     return tokenizer, model, "T5-base Fine-tuned on ToS corpus"
 
 
-def chunk_text(text: str, max_words: int = 400) -> list:
+def chunk_text(text: str, max_words: int = 700) -> list:
     words = text.split()
     return [
         ' '.join(words[i: i + max_words])
@@ -117,9 +105,9 @@ def generate_summary(text: str, tokenizer, model) -> str:
 
     for chunk in chunks:
         # T5 requires task prefix
-        input_text = "summarize: " + chunk
+        prefixed = "summarize: " + chunk
         inputs = tokenizer(
-            input_text,
+            prefixed,
             max_length=512,
             truncation=True,
             return_tensors="pt",
@@ -129,10 +117,10 @@ def generate_summary(text: str, tokenizer, model) -> str:
             ids = model.generate(
                 inputs["input_ids"],
                 attention_mask=inputs["attention_mask"],
-                max_length=per_chunk_len,
+                max_new_tokens=per_chunk_len,
                 min_length=20,
-                num_beams=2,
-                length_penalty=1.0,
+                num_beams=4,
+                length_penalty=1.2,
                 no_repeat_ngram_size=3,
                 early_stopping=True,
             )
@@ -192,9 +180,11 @@ def inject_css():
         color: #6b7280;
         margin-bottom: 1.5rem;
     }
-    /* Hide deploy button & running indicator */
+    /* Hide deploy button */
     [data-testid="stDeployButton"] { display: none !important; }
-    [data-testid="stStatusWidget"] { display: none !important; }
+    /* Hide running man animation, keep "Running" text */
+    [data-testid="stStatusWidget"] svg { display: none !important; }
+    [data-testid="stStatusWidget"] img { display: none !important; }
     .summary-box {
         background-color: #f0f9ff;
         border-left: 4px solid #0ea5e9;
@@ -344,7 +334,8 @@ def main():
 
     # Footer
     st.markdown(
-        '<div class="footer">NLP Final Project</div>',
+        '<div class="footer">NLP Final Project · COMP6885001 · Bina Nusantara University · 2025<br>'
+        'Andrey Apriliady · Ezra Mayurga · Keanu Stadeva</div>',
         unsafe_allow_html=True,
     )
 
